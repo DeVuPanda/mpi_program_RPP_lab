@@ -1,6 +1,7 @@
 #include <mpi.h>
 #include <iostream>
 #include <cmath>
+#include <vector>
 
 using namespace std;
 
@@ -24,12 +25,33 @@ int main(int argc, char* argv[]) {
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    startTime = MPI_Wtime();
+    int local_start = 0, local_end = 0;
 
-    int range = end - start + 1;
-    int chunk = range / size;
-    int local_start = start + rank * chunk;
-    int local_end = (rank == size - 1) ? end : local_start + chunk - 1;
+    if (rank == 0) {
+        int range = end - start + 1;
+        int chunk = range / size;
+        for (int i = 0; i < size; ++i) {
+            int ls = start + i * chunk;
+            int le = (i == size - 1) ? end : ls + chunk - 1;
+            if (i == 0) {
+                local_start = ls;
+                local_end = le;
+            }
+            else {
+                int data[2] = { ls, le };
+                MPI_Send(data, 2, MPI_INT, i, 0, MPI_COMM_WORLD);
+            }
+        }
+    }
+    else {
+        int data[2];
+        MPI_Recv(data, 2, MPI_INT, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        local_start = data[0];
+        local_end = data[1];
+    }
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    startTime = MPI_Wtime();
 
     int local_count = 0;
     for (int i = local_start; i <= local_end; ++i) {
